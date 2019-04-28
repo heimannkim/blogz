@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <h1>{{title}}</h1>
+    <h1><center>{{title}}</center></h1>
     <br>
     <form method="post">
 
@@ -10,8 +10,8 @@
     {% else %}
     
             {% for blog in blogs %}    
-            <h2>{{blog.blogtitle}}</h2>
-            <h3>{{blog.blogbody}}</h3>
+            <a href="./blog?id={{blog.id}}"><h2>{{blog.blogtitle}}</h2></a>
+                <h3>{{blog.blogbody}}</h3>
             <br>
             {% endfor %}        
 
