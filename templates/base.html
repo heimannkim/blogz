@@ -9,7 +9,18 @@
         <h5>
             <a href="/blog">Main Blog Page</a>
             <a href="/newpost">Add a Blog Entry</a>
+            <a href="login">Login</a>
+            <a href="/logout">Logout</a>
         </h5>
+        
+        {% with messages = get_flashed_messages(with_categories=True) %}
+            <ul>
+            {% for category,message in messages %}
+                <li class="{{category}}">{{message}}</li>
+            {% endfor %}
+            </ul>
+        {% endwith %}
+
         {% block content %}
         {% endblock %}
     </body>
