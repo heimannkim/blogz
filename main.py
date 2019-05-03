@@ -33,44 +33,47 @@ class User(db.Model):
 
 @app.before_request
 def require_login():
-    allowed_routes = ['login', 'signup']
+    allowed_routes = ['login', 'index', 'list_blogs', 'signup']
     if request.endpoint not in allowed_routes and 'email' not in session:
         return redirect('/login')
 
-@app.route('/blog', methods=['POST', 'GET'])
+@app.route('/', methods=['POST', 'GET'])
 def index():
 
-    blogs = Blog.query.filter_by(owner=owner).all()
-    oneblog = request.args.get('id')    
-    if not oneblog:
-        return render_template("bloglist.html", title="Build a Blog", blogs=blogs)
-    else:
-        blogindi = Blog.query.get(oneblog)
-        return render_template("blogindi.html", blogtitle=blogindi.blogtitle, blogbody=blogindi.blogbody)
+    users = User.query.all()
+    return render_template("index.html", title="Blog Users", users=users)
 
+@app.route('/blog')
+def list_blogs():
+
+    oneblog = request.args.get('id')
+    oneuser = request.args.get('user')
+    if oneblog:
+        blogindi = Blog.query.get(oneblog)
+        return render_template("blogindi.html", newpost=blogindi)
+    elif oneuser:
+        user = User.query.get(oneuser)
+        return render_template("singleuser.html", title="Blogs by User", blogs=user.blogs)
+    else:
+        blogs = Blog.query.all()
+        return render_template("bloglist.html", title="Build a Blog", blogs=blogs)
+    
 @app.route('/newpost', methods=['POST', 'GET'])
 def new_post():
-
+    
     owner = User.query.filter_by(email=session['email']).first()
     if request.method == 'POST':
-        titleerror = ''
-        bodyerror = '' 
         newtitle = request.form['blogtitle']
         newbody = request.form['blogbody']
         if (not newtitle) or (newtitle.strip() == ''):
-            titleerror = "Please fill in the title"
+            flash('Please fill in the title', 'error')
         if (not newbody) or (newbody.strip() == '') :
-            bodyerror = "Please fill in the body"
-        if (not titleerror) and (not bodyerror):
+            flash('Please fill in the body'), 'error'
+        if newtitle and newbody:
             newpost = Blog(newtitle, newbody, owner)
             db.session.add(newpost)
             db.session.commit()
-            blogindi = Blog.query.get(newpost.id)
-            return render_template("blogindi.html", blogtitle=blogindi.blogtitle, blogbody=blogindi.blogbody)
-        else:
-            return render_template("blogadd.html", title="Add a Blog Entry",
-                newtitle=newtitle, titleerror=titleerror, 
-                newbody=newbody, bodyerror=bodyerror)
+            return render_template("blogindi.html", newpost = newpost)
     return render_template("blogadd.html", title="Add a Blog Entry")
 
 @app.route('/login', methods=['POST', 'GET'])
@@ -84,12 +87,13 @@ def login():
             session['email'] = email
             flash('Logged in')
             return redirect('/newpost')
+        elif user and user.password != password:
+            flash('User password incorrect', 'error')
+            return render_template('login.html', title="Login", email=email)
         else:
-            if user and user.password != password:
-                flash('User password incorrect', 'error')
-            else:
-                flash('User does not exist', 'error')
-    return render_template('login.html')
+            flash('User does not exist', 'error')
+            return render_template('login.html', title="Login", email=email)
+    return render_template('login.html', title="Login")
 
 @app.route('/signup', methods=['POST', 'GET'])
 def signup():
@@ -98,37 +102,65 @@ def signup():
         email = request.form['email']
         password = request.form['password']
         verify = request.form['verify']
+
         if email == '':
-            flash("Email can't be left blank")
+            flash("Email can't be left blank", "error")
             email = ''
-        else:
-        if ' ' in email:
-            email_error = "Email can't contain spaces"        
+        elif ' ' in email:
+            flash("Email can't contain spaces", "error")        
             email = ''
+        elif (len(email) < 3 or len(email) > 50):
+            flash('Email must be between 3 and 50 characters long', 'error')        
+            email = ''
+        elif email.count('@') != 1 and email.count('.') != 1:
+            flash('Email must contain one @ and one .(dot)', 'error')        
+            email = ''
+        
+        if password == '':
+            flash("Password can't be left blank", "error")
+            password = ''
+        elif ' ' in password:
+            flash("Password can't contain spaces", "error")        
+            password = ''
+        elif len(password) < 3 or len(password) > 25:
+            flash('Password must be between 3 and 25 characters long', 'error')        
+            password = ''
+        
+        if verify == '':
+            flash("Verify can't be left blank", "error")
+            verify = ''
+        elif ' ' in verify:
+            flash("Verify can't contain spaces", "error")        
+            verify = ''
+        elif len(verify) < 3 or len(verify) > 25:
+            flash('Verify must be between 3 and 25 characters long', 'error')        
+            verify = ''    
+        elif verify != password:
+            flash("Verify doesn't match password", "error")
+            verify = ''
+
+        if not email or not password or not verify:
+            # return redirect('/signup')
+            return render_template('signup.html', title="Signup", email=email)
         else:
-            if (len(email) < 5 or len(email) > 50):
-                email_error = "Email must be between 5 and 50 characters long"        
-                email = ''
+            existing_user = User.query.filter_by(email=email).first()
+            if not existing_user:
+                new_user = User(email,password)
+                db.session.add(new_user)
+                db.session.commit()
+                session['email'] = email
+                return redirect('/newpost')
             else:
-                if email.count('@') != 1 and email.count('.') != 1:
-                    email_error = "Email must contain one @ and one .(dot)"        
-                    email = ''
-        existing_user = User.query.filter_by(email=email).first()
-        if not existing_user:
-            new_user = User(email,password)
-            db.session.add(new_user)
-            db.session.commit()
-            session['email'] = email
-            return redirect('/newpost')
-        else:
-            flash('User already exists', 'error')
-    return render_template('signup.html')
+                flash('User already exists', 'error')
+                
+    return render_template('signup.html', title="Signup")
 
 @app.route('/logout')
 def logout():
 
     del session['email']
-    return redirect('blog')
+    flash('Logged out')
+    return redirect('/blog')
 
 if __name__ == '__main__':
     app.run()
